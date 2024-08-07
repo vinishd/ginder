@@ -27,25 +27,5 @@ export default function RootLayout({
         </ThemeProvider>
       </body>
     </html>
-
-    // // Continue from next steps on https://clerk.com/docs/quickstarts/nextjs
-    // <ClerkProvider>
-    //   <html lang="en">
-    //     <body className={inter.className}>
-    //       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-    //         <Header />
-    //         <main>
-    //           <SignedOut>
-    //             <SignInButton />
-    //           </SignedOut>
-    //           <SignedIn>
-    //             <UserButton />
-    //             {children}
-    //           </SignedIn>
-    //         </main>
-    //       </ThemeProvider>
-    //     </body>
-    //   </html>
-    // </ClerkProvider>
   );
 }

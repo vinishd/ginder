@@ -9,7 +9,7 @@ import { queryFlowise } from "../lib/actions/flowiseActions";
 import socketIOClient from "socket.io-client";
 
 export default function Home() {
-  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: "userMessage" | "apiMessage"; content: string }[]>([]);
   const [input, setInput] = useState("");
   const [socketIOClientId, setSocketIOClientId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -32,13 +32,13 @@ export default function Home() {
       },
       start: () => {
         console.log("LLM started streaming");
-        setMessages(prevMessages => [...prevMessages, { role: "assistant", content: "" }]);
+        setMessages(prevMessages => [...prevMessages, { role: "apiMessage", content: "" }]);
       },
       token: (token: string) => {
         setMessages(prevMessages => {
           const updatedMessages = [...prevMessages];
           const lastMessage = updatedMessages[updatedMessages.length - 1];
-          if (lastMessage?.role === "assistant") {
+          if (lastMessage?.role === "apiMessage") {
             return [...updatedMessages.slice(0, -1), { ...lastMessage, content: lastMessage.content + token }];
           }
           return updatedMessages;
@@ -88,7 +88,7 @@ export default function Home() {
     if ((!input.trim() && !message) || isLoading) return;
 
     const newMessage = message || input;
-    setMessages(prev => [...prev, { role: "user", content: newMessage }]);
+    setMessages(prev => [...prev, { role: "userMessage", content: newMessage }]);
     setInput("");
     setIsLoading(true);
 
@@ -102,7 +102,7 @@ export default function Home() {
       console.error("Error:", error);
       setMessages(prev => [
         ...prev,
-        { role: "assistant", content: "Oops! Something went wrong. Please try again or ask a different question." },
+        { role: "apiMessage", content: "Oops! Something went wrong. Please try again or ask a different question." },
       ]);
     } finally {
       setIsLoading(false);
@@ -173,22 +173,22 @@ export default function Home() {
               {messages.map((message, index) => (
                 <div
                   key={index}
-                  className={`mb-4 flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`mb-4 flex ${message.role === "userMessage" ? "justify-end" : "justify-start"}`}
                 >
-                  {message.role === "assistant" && (
+                  {message.role === "apiMessage" && (
                     <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center mr-2">
                       <span className="text-sm">🤖</span>
                     </div>
                   )}
                   <div
-                    className={`rounded-lg p-3 max-w-[70%] ${message.role === "user"
+                    className={`rounded-lg p-3 max-w-[70%] ${message.role === "userMessage"
                         ? "bg-blue-500 text-white"
                         : "bg-gray-200 text-gray-800"
                       }`}
                   >
                     {message.content}
                   </div>
-                  {message.role === "user" && (
+                  {message.role === "userMessage" && (
                     <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center ml-2">
                       <span className="text-sm text-white">👤</span>
                     </div>
