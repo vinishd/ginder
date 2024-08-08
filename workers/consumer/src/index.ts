@@ -22,9 +22,14 @@ async function process(message: Message, env: Env): Promise<void> {
 	const { repo, githubToken, username } = message;
 	const octokit = new Octokit({ auth: githubToken });
 	const [owner, repoName] = repo.split('/');
+	const key = `processed_${repo}`;
 
 	try {
-		// Fetch README content
+		const exists = await env.CACHE.get(key);
+		if (exists) {
+			console.log('Already processed');
+			return;
+		}
 		const readmeResponse = await octokit.repos.getReadme({
 			owner,
 			repo: repoName,
@@ -86,8 +91,9 @@ Provide only the bullet-point summary, with no additional text before or after.`
 			},
 		};
 		console.log('Vectorized data for', repo, ':', vector);
-		const key = `processed_${repo}`;
-		await env.CACHE.put(key, JSON.stringify(vector)); // TODO: expiration?
+		await env.CACHE.put(key, JSON.stringify(vector), {
+			metadata: vector.metadata,
+		}); // TODO: expiration?
 	} catch (error) {
 		console.error('Error processing repository:', repo, error);
 	}
