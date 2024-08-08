@@ -1,6 +1,5 @@
 https://github.com/haipera/haipera
 https://github.com/patched-codes/patchwork
-https://github.com/ionworks
 https://github.com/paramm-team/pybamm-param
 https://github.com/panoratech/Panora
 https://github.com/gauge-sh/tach
