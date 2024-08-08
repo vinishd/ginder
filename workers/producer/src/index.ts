@@ -1,18 +1,15 @@
 import { Hono } from 'hono';
-import { Ai } from '@cloudflare/workers-types';
+import { Ai, Queue } from '@cloudflare/workers-types';
 import { Octokit } from '@octokit/rest';
 import { Buffer } from 'buffer';
 import dedent from 'dedent';
-import { Kafka } from '@upstash/kafka';
 
 interface Env {
 	VECTORIZE_INDEX: VectorizeIndex;
 	AI: Ai;
 	APP_SECRET: string;
 	GITHUB_TOKEN: string;
-	UPSTASH_KAFKA_REST_URL: string;
-	UPSTASH_KAFKA_REST_USERNAME: string;
-	UPSTASH_KAFKA_REST_PASSWORD: string;
+	QUEUE: Queue;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -149,26 +146,19 @@ app.post('/process-user', async c => {
 		);
 		const processedRepos: any[] = []; // TODO: add interface
 
-		const kafka = new Kafka({
-			url: c.env.UPSTASH_KAFKA_REST_URL,
-			username: c.env.UPSTASH_KAFKA_REST_USERNAME,
-			password: c.env.UPSTASH_KAFKA_REST_PASSWORD,
-		});
-		const producer = kafka.producer();
-		const topic = 'repo-processing';
+		await Promise.all(
+			repos.map(async r => {
+				await c.env.QUEUE.send(
+					JSON.stringify({
+						repo: r.full_name,
+						githubToken,
+						username,
+					})
+				);
+				processedRepos.push(r.full_name);
+			})
+		);
 
-		for (const repo of repos) {
-			console.log(`Processing repo: ${repo.full_name}`);
-			await producer.produce(
-				topic,
-				JSON.stringify({
-					repo: repo.full_name,
-					githubToken,
-					username,
-				})
-			);
-			processedRepos.push(repo.full_name);
-		}
 		console.log('number of repos: ', repos.length);
 
 		return c.json({ success: true, processedRepos });

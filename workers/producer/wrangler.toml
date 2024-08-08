@@ -8,6 +8,10 @@ index_name = "ginder-repos"
  [ai]
  binding = "AI"
 
+[[queues.producers]]
+binding = "QUEUE"
+queue = "ginder-repo-processing-queue"
+
 # [vars]
 # MY_VAR = "my-variable"
 
