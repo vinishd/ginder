@@ -12,6 +12,10 @@ index_name = "ginder-repos"
 binding = "QUEUE"
 queue = "ginder-repo-processing-queue"
 
+[[kv_namespaces]]
+binding = "CACHE"
+id = "d1e788ede92a475697ff52a592512a1d"
+
 # [vars]
 # MY_VAR = "my-variable"
 
