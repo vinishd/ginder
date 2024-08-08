@@ -3,13 +3,19 @@ import { Ai } from '@cloudflare/workers-types';
 import { Octokit } from '@octokit/rest';
 import { Buffer } from 'buffer';
 import dedent from 'dedent';
+import { Kafka } from '@upstash/kafka';
 
-interface Bindings {
+interface Env {
 	VECTORIZE_INDEX: VectorizeIndex;
 	AI: Ai;
+	APP_SECRET: string;
+	GITHUB_TOKEN: string;
+	UPSTASH_KAFKA_REST_URL: string;
+	UPSTASH_KAFKA_REST_USERNAME: string;
+	UPSTASH_KAFKA_REST_PASSWORD: string;
 }
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<{ Bindings: Env }>();
 
 const authMiddleware = async (c: any, next: () => Promise<void>) => {
 	const authHeader = c.req.header('Authorization');
@@ -120,6 +126,54 @@ Provide only the bullet-point summary, with no additional text before or after.`
 			},
 			500
 		);
+	}
+});
+
+app.post('/process-user', async c => {
+	const { githubToken } = await c.req.json();
+	if (!githubToken) {
+		return c.json({ error: 'GitHub token is required' }, 400);
+	}
+
+	const octokit = new Octokit({ auth: githubToken });
+	// Get the authenticated user's information
+	const { data: user } = await octokit.users.getAuthenticated();
+	const username = user.login;
+
+	try {
+		const repos = await octokit.paginate(
+			octokit.repos.listForAuthenticatedUser,
+			{
+				per_page: 300,
+			}
+		);
+		const processedRepos: any[] = []; // TODO: add interface
+
+		const kafka = new Kafka({
+			url: c.env.UPSTASH_KAFKA_REST_URL,
+			username: c.env.UPSTASH_KAFKA_REST_USERNAME,
+			password: c.env.UPSTASH_KAFKA_REST_PASSWORD,
+		});
+		const producer = kafka.producer();
+		const topic = 'repo-processing';
+
+		for (const repo of repos) {
+			console.log(`Processing repo: ${repo.full_name}`);
+			await producer.produce(
+				topic,
+				JSON.stringify({
+					repo: repo.full_name,
+					githubToken,
+					username,
+				})
+			);
+			processedRepos.push(repo.full_name);
+		}
+		console.log('number of repos: ', repos.length);
+
+		return c.json({ success: true, processedRepos });
+	} catch (e) {
+		return c.json({ error: (e as Error).message }, 500);
 	}
 });
 
