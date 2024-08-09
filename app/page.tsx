@@ -14,6 +14,7 @@ import { type ThemeProviderProps } from "next-themes/dist/types"
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return <NextThemesProvider {...props}>{children}</NextThemesProvider>
 }
+import { useSession } from "next-auth/react";
 
 export default function Home() {
   const [messages, setMessages] = useState<{ role: "userMessage" | "apiMessage"; content: string }[]>([]);
@@ -23,6 +24,16 @@ export default function Home() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { data: session } = useSession();
+
+  useEffect(() => {
+    if (session) {
+      fetch('/api/process-repos', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => console.log('Processing initiated:', data))
+        .catch(error => console.error('Error initiating processing:', error));
+    }
+  }, [session]);
 
   const exampleMessages = [
     { heading: "What are some", subheading: "popular open source projects I can contribute to?", message: "What are some popular open source projects I can contribute to?" },
