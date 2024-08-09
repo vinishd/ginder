@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { queryFlowise } from "../lib/actions/flowiseActions";
 import socketIOClient from "socket.io-client";
+import { CornerDownLeft } from 'lucide-react';
+import { ThemeProvider as NextThemesProvider } from "next-themes"
+import { type ThemeProviderProps } from "next-themes/dist/types"
+ 
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+}
 
 export default function Home() {
   const [messages, setMessages] = useState<{ role: "userMessage" | "apiMessage"; content: string }[]>([]);
@@ -117,117 +124,123 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)] relative">
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 overflow-y-auto">
-        <div className="max-w-2xl mx-auto">
-          {messages.length === 0 ? (
-            <>
-              {/* Welcome message */}
-              <Card className="p-6">
-                <CardHeader>
-                  <CardTitle>Welcome to GINDER Chatbot!</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p>
-                    This chatbot is a tool to help you find the perfect open
-                    source repository to contribute to.
-                  </p>
-                  <p>Here are some instructions to get started:</p>
-                  <ul className="list-disc pl-6 mt-2">
-                    <li>
-                      Connect your GitHub account to GINDER in "Data" section
-                    </li>
-                    <li>Let the chatbot know your skills and interests</li>
-                    <li>The chatbot will suggest repositories to you</li>
-                    <li>
-                      Add repositories to "Repositories" section to monitor open
-                      issues
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-              {/* Example messages */}
-              <div className="max-w-2xl mx-auto">
-                <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {exampleMessages.map((example, index) => (
-                    <div
-                      key={index}
-                      className={`cursor-pointer rounded-lg border bg-white p-4 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 ${
-                        index > 1 && 'hidden md:block'
-                      }`}
-                      onClick={() => {
-                        sendMessage(example.message);
-                      }}
-                    >
-                      <div className="text-sm font-semibold">{example.heading}</div>
-                      <div className="text-sm text-zinc-600">
-                        {example.subheading}
+    <ThemeProvider attribute="class">
+      <div className="flex flex-col h-[calc(100vh-3.5rem)] relative">
+        <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 overflow-y-auto">
+          <div className="max-w-2xl mx-auto">
+            {messages.length === 0 ? (
+              <>
+                {/* Welcome message */}
+                <Card className="p-6">
+                  <CardHeader>
+                    <CardTitle>Welcome to GINDER!</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p>
+                      This chatbot is a tool to help you find the perfect open
+                      source repository to contribute to.
+                    </p>
+                    <p>Here are some instructions to get started:</p>
+                    <ul className="list-disc pl-6 mt-2">
+                      <li>
+                        Connect your GitHub account to GINDER in "Data" section
+                      </li>
+                      <li>Let the chatbot know your skills and interests</li>
+                      <li>The chatbot will suggest repositories to you</li>
+                      <li>
+                        Add repositories to "Repositories" section to monitor open
+                        issues
+                      </li>
+                    </ul>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <>
+                {messages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`mb-4 flex ${message.role === "userMessage" ? "justify-end" : "justify-start"}`}
+                  >
+                    {message.role === "apiMessage" && (
+                      <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center mr-2">
+                        <span className="text-sm">🤖</span>
                       </div>
+                    )}
+                    <div
+                      className={`rounded-lg p-3 max-w-[70%] ${message.role === "userMessage"
+                          ? "bg-blue-500 text-white"
+                          : "bg-gray-200 text-gray-800"
+                        }`}
+                    >
+                      {message.content}
                     </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              {messages.map((message, index) => (
+                    {message.role === "userMessage" && (
+                      <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center ml-2">
+                        <span className="text-sm text-white">👤</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
+              </>
+            )}
+          </div>
+        </ScrollArea>
+        
+        {/* Example messages */}
+        <div className="p-4 border-t bg-white dark:bg-zinc-950">
+          <div className="max-w-2xl mx-auto">
+            <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {exampleMessages.map((example, index) => (
                 <div
                   key={index}
-                  className={`mb-4 flex ${message.role === "userMessage" ? "justify-end" : "justify-start"}`}
+                  className={`cursor-pointer rounded-lg border bg-white p-4 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 ${
+                    index > 1 && 'hidden md:block'
+                  }`}
+                  onClick={() => {
+                    sendMessage(example.message);
+                  }}
                 >
-                  {message.role === "apiMessage" && (
-                    <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center mr-2">
-                      <span className="text-sm">🤖</span>
-                    </div>
-                  )}
-                  <div
-                    className={`rounded-lg p-3 max-w-[70%] ${message.role === "userMessage"
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-200 text-gray-800"
-                      }`}
-                  >
-                    {message.content}
+                  <div className="text-sm font-semibold dark:text-white">{example.heading}</div>
+                  <div className="text-sm text-zinc-600 dark:text-white">
+                    {example.subheading}
                   </div>
-                  {message.role === "userMessage" && (
-                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center ml-2">
-                      <span className="text-sm text-white">👤</span>
-                    </div>
-                  )}
                 </div>
               ))}
-              <div ref={messagesEndRef} />
-            </>
-          )}
+            </div>
+          </div>
         </div>
-      </ScrollArea>
-      
-      <div className="p-4 border-t">
-        <div className="max-w-2xl mx-auto">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              sendMessage();
-            }}
-            className="flex space-x-2"
-          >
-            <Textarea
-              ref={textareaRef}
-              value={input}
-              onChange={handleInput}
-              onKeyDown={handleKeyDown}
-              placeholder="Send a message."
-              className="flex-1 min-h-[50px] p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="bg-[#428646] text-white px-4 py-2 rounded-lg hover:bg-[#28a046] focus:outline-none focus:ring-2 focus:ring-[#2dba4e]"
+
+        {/* Send message area */}
+        <div className="p-4 border-t">
+          <div className="max-w-2xl mx-auto">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                sendMessage();
+              }}
+              className="flex flex-col md:flex-row space-x-2 items-center"
             >
-              Send
-            </Button>
-          </form>
+              <Textarea
+                ref={textareaRef}
+                value={input}
+                onChange={handleInput}
+                onKeyDown={handleKeyDown}
+                placeholder="Send a message."
+                className="flex-1 min-h-[50px] p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-800"
+              >
+                <CornerDownLeft size={24} />
+              </Button>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+    </ThemeProvider>
   );
 };
