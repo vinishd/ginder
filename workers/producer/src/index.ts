@@ -4,6 +4,7 @@ import { Octokit } from '@octokit/rest';
 import { Buffer } from 'buffer';
 import dedent from 'dedent';
 import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
 import { user } from './db/schema';
 
 interface Env {
@@ -204,6 +205,13 @@ app.get('/users', async c => {
 app.post('/users', async c => {
 	const db = drizzle(c.env.DB);
 	const { username, githubToken, githubId, email } = await c.req.json();
+	const exists = await db
+		.select()
+		.from(user)
+		.where(eq(user.username, username));
+	if (exists.length > 0) {
+		return c.json(exists[0], 200);
+	}
 	const result = await db
 		.insert(user)
 		.values({
@@ -213,7 +221,7 @@ app.post('/users', async c => {
 			email,
 		})
 		.returning();
-	return c.json(result[0]);
+	return c.json(result[0], 201);
 });
 
 export default app;
