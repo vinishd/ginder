@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { queryFlowise } from "../lib/actions/flowiseActions";
+import { queryFlowise } from "../lib/actions/flowise";
 import socketIOClient from "socket.io-client";
 
 export default function Home() {

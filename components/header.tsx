@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useTheme } from 'next-themes';
 import { DarkMode, LightMode, GitHub, Menu, Close } from '@mui/icons-material';
+import { useSession, signIn, signOut } from "next-auth/react"
 
 export function Header({
   className,
@@ -15,6 +16,7 @@ export function Header({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuHeight, setMenuHeight] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { data: session, status } = useSession()
 
   const toggleMenu = () => setIsMenuOpen(prev => !prev);
 
@@ -66,8 +68,15 @@ export function Header({
               <GitHub className="h-5 w-5" />
             </Link>
           </Button>
-          <Button variant="ghost" className="hidden md:inline-flex">Connect to GitHub</Button>
-          {/* <SignIn variant="ghost" className="hidden md:inline-flex"></SignIn> */}
+          {status === "authenticated" ? (
+            <Button onClick={() => signOut()} variant="outline">
+              Sign out
+            </Button>
+          ) : (
+            <Button onClick={() => signIn("github")} variant="outline">
+              Sign In
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -111,7 +120,6 @@ export function Header({
               {item.label}
             </Link>
           ))}
-          {/* <Button variant="ghost" onClick={toggleMenu}>Connect to GitHub</Button> */}
         </nav>
       </div>
     </header>
