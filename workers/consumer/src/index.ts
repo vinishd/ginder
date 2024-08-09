@@ -1,17 +1,22 @@
-import { Ai, KVNamespace } from '@cloudflare/workers-types';
+import { Ai, KVNamespace, D1Database } from '@cloudflare/workers-types';
 import { Octokit } from '@octokit/rest';
 import { Buffer } from 'buffer';
 import dedent from 'dedent';
+import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
+import { user, userRepo } from './db/schema';
 
 interface Env {
 	AI: Ai;
 	CACHE: KVNamespace;
+	DB: D1Database;
 }
 
 interface Message {
 	repo: string;
 	githubToken: string;
 	username: string;
+	userId: number;
 }
 
 interface EmbeddingResponse {
@@ -19,7 +24,14 @@ interface EmbeddingResponse {
 	data: number[][];
 }
 async function process(message: Message, env: Env): Promise<void> {
-	const { repo, githubToken, username } = message;
+	const { repo, githubToken, username, userId } = message;
+	const db = drizzle(env.DB);
+	const userData = await db.select().from(user).where(eq(user.id, userId)).get();
+	if (!userData) {
+		console.error('User not found');
+		return;
+	}
+
 	const octokit = new Octokit({ auth: githubToken });
 	const [owner, repoName] = repo.split('/');
 	const key = `processed_${repo}`;
@@ -94,6 +106,11 @@ Provide only the bullet-point summary, with no additional text before or after.`
 		await env.CACHE.put(key, JSON.stringify(vector), {
 			metadata: vector.metadata,
 		}); // TODO: expiration?
+
+		await db.insert(userRepo).values({
+			userId,
+			repo,
+		});
 	} catch (error) {
 		console.error('Error processing repository:', repo, error);
 	}

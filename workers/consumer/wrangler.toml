@@ -14,7 +14,13 @@ max_batch_timeout = 30
 
 [[kv_namespaces]]
 binding = "CACHE"
-id = "d1e788ede92a475697ff52a592512a1d"
+id = "babbf6cb8c424f38b6ba9adf5ec14b3a"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ginder"
+database_id = "05f0384d-28fb-49d3-815f-9a49b593a187"
+migrations_dir = "drizzle"
 
 # Automatically place your workloads in an optimal location to minimize latency.
 # If you are running back-end logic in a Worker, running it closer to your back-end infrastructure

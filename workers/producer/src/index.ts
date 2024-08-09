@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
-import { Ai, Queue } from '@cloudflare/workers-types';
+import { Ai, Queue, D1Database, KVNamespace } from '@cloudflare/workers-types';
 import { Octokit } from '@octokit/rest';
 import { Buffer } from 'buffer';
 import dedent from 'dedent';
+import { drizzle } from 'drizzle-orm/d1';
+import { user } from './db/schema';
 
 interface Env {
 	VECTORIZE_INDEX: VectorizeIndex;
@@ -10,6 +12,8 @@ interface Env {
 	APP_SECRET: string;
 	GITHUB_TOKEN: string;
 	QUEUE: Queue;
+	DB: D1Database;
+	CACHE: KVNamespace;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -127,7 +131,7 @@ Provide only the bullet-point summary, with no additional text before or after.`
 });
 
 app.post('/process-user', async c => {
-	const { githubToken } = await c.req.json();
+	const { githubToken, userId } = await c.req.json();
 	if (!githubToken) {
 		return c.json({ error: 'GitHub token is required' }, 400);
 	}
@@ -153,6 +157,7 @@ app.post('/process-user', async c => {
 						repo: r.full_name,
 						githubToken,
 						username,
+						userId,
 					})
 				);
 				processedRepos.push(r.full_name);
@@ -187,6 +192,28 @@ app.get('/query', async c => {
 	});
 
 	return c.json({ status: 'ok' });
+});
+
+app.get('/users', async c => {
+	const db = drizzle(c.env.DB);
+	const result = await db.select().from(user).all();
+	return c.json(result);
+});
+
+// add new user
+app.post('/users', async c => {
+	const db = drizzle(c.env.DB);
+	const { username, githubToken, githubId, email } = await c.req.json();
+	const result = await db
+		.insert(user)
+		.values({
+			username,
+			githubToken,
+			githubId,
+			email,
+		})
+		.returning();
+	return c.json(result[0]);
 });
 
 export default app;

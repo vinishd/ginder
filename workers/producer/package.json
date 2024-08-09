@@ -1,17 +1,22 @@
 {
-  "name": "workers",
-  "scripts": {
-    "dev": "wrangler dev src/index.ts",
-    "deploy": "wrangler deploy --minify src/index.ts"
-  },
-  "dependencies": {
-    "@octokit/rest": "^21.0.1",
-    "buffer": "^6.0.3",
-    "dedent": "^1.5.3",
-    "hono": "^4.5.4"
-  },
-  "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240529.0",
-    "wrangler": "^3.57.2"
-  }
+	"name": "workers",
+	"scripts": {
+		"dev": "wrangler dev src/index.ts",
+		"deploy": "wrangler deploy --minify src/index.ts",
+		"db:generate": "drizzle-kit generate",
+		"db:apply:local": "pnpm wrangler d1 migrations apply ginder --local",
+		"db:apply:remote": "pnpm wrangler d1 migrations apply ginder --remote"
+	},
+	"dependencies": {
+		"@octokit/rest": "^21.0.1",
+		"buffer": "^6.0.3",
+		"dedent": "^1.5.3",
+		"drizzle-orm": "^0.33.0",
+		"hono": "^4.5.4"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20240529.0",
+		"drizzle-kit": "^0.24.0",
+		"wrangler": "^3.57.2"
+	}
 }
