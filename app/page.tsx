@@ -189,7 +189,7 @@ export default function Home() {
         </ScrollArea>
         
         {/* Example messages */}
-        <div className="p-4 border-t bg-white dark:bg-zinc-950">
+        <div className="p-4 bg-white dark:bg-zinc-950">
           <div className="max-w-2xl mx-auto">
             <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
               {exampleMessages.map((example, index) => (
