@@ -8,6 +8,22 @@ index_name = "ginder-repos"
  [ai]
  binding = "AI"
 
+[[queues.producers]]
+binding = "QUEUE"
+queue = "ginder-repo-processing-queue"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "babbf6cb8c424f38b6ba9adf5ec14b3a"
+preview_id = "a48107f54cae452f98de949f6519e346"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ginder"
+database_id = "05f0384d-28fb-49d3-815f-9a49b593a187"
+migrations_dir = "drizzle"
+
+
 # [vars]
 # MY_VAR = "my-variable"
 

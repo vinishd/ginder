@@ -1,0 +1,25 @@
+{
+	"name": "consumer",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev",
+		"start": "wrangler dev",
+		"test": "vitest",
+		"cf-typegen": "wrangler types"
+	},
+	"devDependencies": {
+		"@cloudflare/vitest-pool-workers": "^0.4.5",
+		"@cloudflare/workers-types": "^4.20240806.0",
+		"typescript": "^5.5.2",
+		"vitest": "1.5.0",
+		"wrangler": "^3.60.3"
+	},
+	"dependencies": {
+		"@octokit/rest": "^21.0.1",
+		"buffer": "^6.0.3",
+		"dedent": "^1.5.3",
+		"drizzle-orm": "^0.33.0"
+	}
+}

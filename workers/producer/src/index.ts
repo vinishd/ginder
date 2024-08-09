@@ -1,15 +1,23 @@
 import { Hono } from 'hono';
-import { Ai } from '@cloudflare/workers-types';
+import { Ai, Queue, D1Database, KVNamespace } from '@cloudflare/workers-types';
 import { Octokit } from '@octokit/rest';
 import { Buffer } from 'buffer';
 import dedent from 'dedent';
+import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
+import { user } from './db/schema';
 
-interface Bindings {
+interface Env {
 	VECTORIZE_INDEX: VectorizeIndex;
 	AI: Ai;
+	APP_SECRET: string;
+	GITHUB_TOKEN: string;
+	QUEUE: Queue;
+	DB: D1Database;
+	CACHE: KVNamespace;
 }
 
-const app = new Hono<{ Bindings: Bindings }>();
+const app = new Hono<{ Bindings: Env }>();
 
 const authMiddleware = async (c: any, next: () => Promise<void>) => {
 	const authHeader = c.req.header('Authorization');
@@ -123,6 +131,48 @@ Provide only the bullet-point summary, with no additional text before or after.`
 	}
 });
 
+app.post('/process-user', async c => {
+	const { githubToken, userId } = await c.req.json();
+	if (!githubToken) {
+		return c.json({ error: 'GitHub token is required' }, 400);
+	}
+
+	const octokit = new Octokit({ auth: githubToken });
+	// Get the authenticated user's information
+	const { data: user } = await octokit.users.getAuthenticated();
+	const username = user.login;
+
+	try {
+		const repos = await octokit.paginate(
+			octokit.repos.listForAuthenticatedUser,
+			{
+				per_page: 300,
+			}
+		);
+		const processedRepos: any[] = []; // TODO: add interface
+
+		await Promise.all(
+			repos.map(async r => {
+				await c.env.QUEUE.send(
+					JSON.stringify({
+						repo: r.full_name,
+						githubToken,
+						username,
+						userId,
+					})
+				);
+				processedRepos.push(r.full_name);
+			})
+		);
+
+		console.log('number of repos: ', repos.length);
+
+		return c.json({ success: true, processedRepos });
+	} catch (e) {
+		return c.json({ error: (e as Error).message }, 500);
+	}
+});
+
 app.get('/describe', async c => {
 	const index = await c.env.VECTORIZE_INDEX.describe();
 	return Response.json(index);
@@ -143,6 +193,35 @@ app.get('/query', async c => {
 	});
 
 	return c.json({ status: 'ok' });
+});
+
+app.get('/users', async c => {
+	const db = drizzle(c.env.DB);
+	const result = await db.select().from(user).all();
+	return c.json(result);
+});
+
+// add new user
+app.post('/users', async c => {
+	const db = drizzle(c.env.DB);
+	const { username, githubToken, githubId, email } = await c.req.json();
+	const exists = await db
+		.select()
+		.from(user)
+		.where(eq(user.username, username));
+	if (exists.length > 0) {
+		return c.json(exists[0], 200);
+	}
+	const result = await db
+		.insert(user)
+		.values({
+			username,
+			githubToken,
+			githubId,
+			email,
+		})
+		.returning();
+	return c.json(result[0], 201);
 });
 
 export default app;

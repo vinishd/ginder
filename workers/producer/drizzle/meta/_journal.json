@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1723170566090,
+      "tag": "0000_parallel_brood",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1723170793166,
+      "tag": "0001_safe_sauron",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1723171876616,
+      "tag": "0002_public_owl",
+      "breakpoints": true
+    }
+  ]
+}
