@@ -16,6 +16,7 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 }
 import { useSession } from 'next-auth/react';
 import { exampleMessages } from '@/lib/data/example-messages';
+import { CustomSession } from '@/app/api/auth/[...nextauth]/option';
 
 export default function Home() {
 	const [messages, setMessages] = useState<
@@ -27,7 +28,8 @@ export default function Home() {
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
-	const { data: session } = useSession();
+	const { data: session } = useSession() as { data: CustomSession | null };
+	const [sessionId, setSessionId] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (!session) return;
@@ -62,6 +64,11 @@ export default function Home() {
 			},
 			end: () => console.log('LLM finished streaming'),
 			abort: () => console.log('Execution aborted'),
+			connection_error: (error: Error) =>
+				console.error('Connection error:', error),
+			reconnect_attempt: (attemptNumber: number) =>
+				console.log(`Reconnect attempt: ${attemptNumber}`),
+			reconnect_failed: () => console.error('Reconnect failed'),
 		};
 
 		Object.entries(socketEvents).forEach(([event, handler]) => {
@@ -69,8 +76,10 @@ export default function Home() {
 		});
 
 		return () => {
-			console.log('Disconnecting socket');
-			socket.disconnect();
+			if (session && socket.connected) {
+				console.log('Disconnecting socket');
+				socket.disconnect();
+			}
 		};
 	}, [session]);
 
@@ -112,14 +121,24 @@ export default function Home() {
 		setIsLoading(true);
 
 		try {
-			await queryFlowise({
+			const sid = await queryFlowise({
 				question: newMessage,
-				history: messages.map(msg => ({
-					role: msg.role,
-					content: msg.content,
-				})),
+				history: [
+					{
+						role: 'user',
+						content: `my userId is ${session?.userId}`,
+					},
+					...messages.map(msg => ({
+						role: msg.role,
+						content: msg.content,
+					})),
+				],
 				socketIOClientId,
+				sessionId,
 			});
+			if (!sessionId) {
+				setSessionId(sid);
+			}
 		} catch (error) {
 			console.error('Error:', error);
 			setMessages(prev => [
@@ -143,126 +162,123 @@ export default function Home() {
 	};
 
 	return (
-		<ThemeProvider attribute="class">
-			<div className="flex flex-col h-[calc(100vh-3.5rem)] relative">
-				<ScrollArea ref={scrollAreaRef} className="flex-1 p-4 overflow-y-auto">
-					<div className="max-w-2xl mx-auto">
-						{messages.length === 0 ? (
-							<>
-								{/* Welcome message */}
-								<Card className="p-6">
-									<CardHeader>
-										<CardTitle>Welcome to GINDER!</CardTitle>
-									</CardHeader>
-									<CardContent>
-										<p>
-											Ginder is your personalized chatbot assistant for discovering
-											open source projects to contribute to!
-										</p>
-										<p className="mt-2">Here's how to get started:</p>
-										<ul className="list-disc pl-6 mt-2">
-											<li>Let the chatbot know your programming skills and interests</li>
-											<li>The chatbot will suggest repositories that match your profile</li>
-											<li>Explore suggested projects and their open issues</li>
-											{/* <li>Save interesting repositories to your "Repositories" list for easy access</li> */}
-										</ul>
-										<p className="mt-2">
-											Ready to find your next exciting open source project? Let's begin!
-										</p>
-									</CardContent>
-								</Card>
-							</>
-						) : (
-							<>
-								{messages.map((message, index) => (
-									<div
-										key={index}
-										className={`mb-4 flex ${message.role === 'userMessage' ? 'justify-end' : 'justify-start'}`}
-									>
-										{message.role === 'apiMessage' && (
-											<div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center mr-2">
-												<span className="text-sm">🤖</span>
-											</div>
-										)}
-										<div
-											className={`rounded-lg p-3 max-w-[70%] ${
-												message.role === 'userMessage'
-													? 'bg-blue-500 text-white'
-													: 'bg-gray-200 text-gray-800'
-											}`}
-										>
-											{message.content}
+		<div className="flex flex-col h-[calc(100vh-3.5rem)] relative">
+			<ScrollArea ref={scrollAreaRef} className="flex-1 p-4 overflow-y-auto">
+				<div className="max-w-2xl mx-auto">
+					{messages.length === 0 ? (
+						<>
+							<Card className="p-6">
+								<CardHeader>
+									<CardTitle>Welcome to GINDER!</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<p>
+										This chatbot is a tool to help you find the perfect open
+										source repository to contribute to.
+									</p>
+									<p>Here are some instructions to get started:</p>
+									<ul className="list-disc pl-6 mt-2">
+										<li>
+											Connect your GitHub account to GINDER in "Data" section
+										</li>
+										<li>Let the chatbot know your skills and interests</li>
+										<li>The chatbot will suggest repositories to you</li>
+										<li>
+											Add repositories to "Repositories" section to monitor open
+											issues
+										</li>
+									</ul>
+								</CardContent>
+							</Card>
+						</>
+					) : (
+						<>
+							{messages.map((message, index) => (
+								<div
+									key={index}
+									className={`mb-4 flex ${message.role === 'userMessage' ? 'justify-end' : 'justify-start'}`}
+								>
+									{message.role === 'apiMessage' && (
+										<div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center mr-2">
+											<span className="text-sm">🤖</span>
 										</div>
-										{message.role === 'userMessage' && (
-											<div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center ml-2">
-												<span className="text-sm text-white">👤</span>
-											</div>
-										)}
-									</div>
-								))}
-								<div ref={messagesEndRef} />
-							</>
-						)}
-					</div>
-				</ScrollArea>
-
-				{/* Example messages */}
-				{messages.length === 0 && (
-					<div className="p-4 bg-white dark:bg-zinc-950">
-						<div className="max-w-2xl mx-auto">
-							<div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-								{exampleMessages.map((example, index) => (
+									)}
 									<div
-										key={index}
-										className={`cursor-pointer rounded-lg border bg-white p-4 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 ${
-											index > 1 && 'hidden md:block'
+										className={`rounded-lg p-3 max-w-[70%] ${
+											message.role === 'userMessage'
+												? 'bg-blue-500 text-white'
+												: 'bg-gray-200 text-gray-800'
 										}`}
-										onClick={() => {
-											sendMessage(example.message);
-										}}
 									>
-										<div className="text-sm font-semibold dark:text-white">
-											{example.heading}
-										</div>
-										<div className="text-sm text-zinc-600 dark:text-white">
-											{example.subheading}
-										</div>
+										{message.content}
 									</div>
-								))}
-							</div>
-						</div>
-					</div>
-				)}
+									{message.role === 'userMessage' && (
+										<div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center ml-2">
+											<span className="text-sm text-white">👤</span>
+										</div>
+									)}
+								</div>
+							))}
+							<div ref={messagesEndRef} />
+						</>
+					)}
+				</div>
+			</ScrollArea>
 
-				{/* Send message area */}
-				<div className="p-4 border-t">
-					<div className="max-w-2xl mx-auto">
-						<form
-							onSubmit={e => {
-								e.preventDefault();
-								sendMessage();
-							}}
-							className="flex flex-col md:flex-row space-x-2 items-center"
-						>
-							<Textarea
-								ref={textareaRef}
-								value={input}
-								onChange={handleInput}
-								onKeyDown={handleKeyDown}
-								placeholder="Send a message."
-								className="flex-1 min-h-[50px] p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-							/>
-							<Button
-								type="submit"
-								disabled={isLoading}
-								className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-800"
+			{/* Example messages */}
+			<div className="p-4 bg-white dark:bg-zinc-950">
+				<div className="max-w-2xl mx-auto">
+					<div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+						{exampleMessages.map((example, index) => (
+							<div
+								key={index}
+								className={`cursor-pointer rounded-lg border bg-white p-4 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 ${
+									index > 1 && 'hidden md:block'
+								}`}
+								onClick={() => {
+									sendMessage(example.message);
+								}}
 							>
-								<CornerDownLeft size={24} />
-							</Button>
-						</form>
+								<div className="text-sm font-semibold dark:text-white">
+									{example.heading}
+								</div>
+								<div className="text-sm text-zinc-600 dark:text-white">
+									{example.subheading}
+								</div>
+							</div>
+						))}
 					</div>
 				</div>
 			</div>
-		</ThemeProvider>
+
+			{/* Send message area */}
+			<div className="p-4 border-t">
+				<div className="max-w-2xl mx-auto">
+					<form
+						onSubmit={e => {
+							e.preventDefault();
+							sendMessage();
+						}}
+						className="flex flex-col md:flex-row space-x-2 items-center"
+					>
+						<Textarea
+							ref={textareaRef}
+							value={input}
+							onChange={handleInput}
+							onKeyDown={handleKeyDown}
+							placeholder="Send a message."
+							className="flex-1 min-h-[50px] p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+						/>
+						<Button
+							type="submit"
+							disabled={isLoading}
+							className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-800"
+						>
+							<CornerDownLeft size={24} />
+						</Button>
+					</form>
+				</div>
+			</div>
+		</div>
 	);
 }

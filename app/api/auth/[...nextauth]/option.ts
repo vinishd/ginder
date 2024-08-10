@@ -1,4 +1,4 @@
-import type { Account, AuthOptions, Profile } from 'next-auth';
+import type { Account, AuthOptions, Profile, Session } from 'next-auth';
 import GithubProvider from 'next-auth/providers/github';
 
 import { JWT } from 'next-auth/jwt';
@@ -17,6 +17,10 @@ interface User {
 	githubId: string;
 	email: string;
 	username: string;
+}
+
+export interface CustomSession extends Session {
+	userId?: string;
 }
 
 export const options: AuthOptions = {
@@ -40,17 +44,23 @@ export const options: AuthOptions = {
 			}
 			return token;
 		},
-		async session({ session, token }: { session: any; token: JWT }) {
+		async session({
+			session,
+			token,
+			user,
+		}: {
+			session: any;
+			token: JWT;
+			user: any;
+		}) {
 			// Send properties to the client, like an access_token from a provider.
 			session.accessToken = token.accessToken;
 			session.username = token.username;
-			return session;
-		},
-		async signIn({ user, account, profile }) {
-			const accessToken = account?.access_token;
-			const username = (profile as any)?.login;
-			const email = user?.email;
-			const name = user?.name;
+
+			const accessToken = token.accessToken;
+			const username = session.username;
+			const email = session.user.email;
+			const name = session.user.name;
 
 			try {
 				const res = await fetch(`${process.env.WORKER_URL}/users`, {
@@ -67,6 +77,8 @@ export const options: AuthOptions = {
 					}),
 				});
 				const { id: userId }: User = await res.json();
+				session.userId = userId;
+
 				const processRes = await fetch(
 					`${process.env.WORKER_URL}/process-user`,
 					{
@@ -81,6 +93,7 @@ export const options: AuthOptions = {
 						}),
 					}
 				);
+
 				if (!processRes.ok) {
 					throw new Error('Failed to process user');
 				}
@@ -88,6 +101,10 @@ export const options: AuthOptions = {
 				console.error(error);
 			}
 
+			return session;
+		},
+
+		async signIn({ user, account, profile }) {
 			return true;
 		},
 	},
