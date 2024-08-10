@@ -100,7 +100,7 @@ export default function Home() {
 		resizeTextarea();
 	};
 
-	const sendMessage = async (message?: string) => {``
+	const sendMessage = async (message?: string) => {
 		if ((!input.trim() && !message) || isLoading || !session) return;
 
 		const newMessage = message || input;
