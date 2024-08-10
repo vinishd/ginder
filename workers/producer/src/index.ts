@@ -5,7 +5,7 @@ import { Buffer } from 'buffer';
 import dedent from 'dedent';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
-import { user } from './db/schema';
+import { user, userRepo } from './db/schema';
 
 interface Env {
 	VECTORIZE_INDEX: VectorizeIndex;
@@ -258,6 +258,81 @@ app.post('/users', async c => {
 		})
 		.returning();
 	return c.json(result[0], 201);
+});
+app.get('/user-recommendations/:userId', async c => {
+	const userId = parseInt(c.req.param('userId'));
+	if (isNaN(userId)) {
+		return c.json({ error: 'Invalid user ID' }, 400);
+	}
+
+	const db = drizzle(c.env.DB);
+
+	// Fetch user's repos from the database
+	const userRepos = await db
+		.select()
+		.from(userRepo)
+		.where(eq(userRepo.userId, userId))
+		.limit(30)
+		.all();
+
+	if (userRepos.length === 0) {
+		return c.json({ error: 'No repositories found for this user' }, 404);
+	}
+
+	// Fetch vectors from cache and perform top-k search
+	const repoCounter: { [key: string]: number } = {};
+	const repoScores: { [key: string]: number } = {};
+	const topK = 5; // Adjust this value as needed
+
+	for (const userRepoEntry of userRepos) {
+		const cacheKey = `processed_${userRepoEntry.repo}`;
+		const cachedVector = await c.env.CACHE.get(cacheKey, 'json');
+
+		if (cachedVector) {
+			const { matches } = await c.env.VECTORIZE_INDEX.query(
+				cachedVector.values,
+				{
+					topK,
+					returnValues: false,
+					returnMetadata: true,
+				}
+			);
+
+			matches.forEach(match => {
+				const repo = match.metadata.repo as string;
+				repoCounter[repo] = (repoCounter[repo] || 0) + 1;
+				repoScores[repo] = Math.max(repoScores[repo] || 0, match.score);
+			});
+		}
+	}
+
+	// Sort repos by count and then by score
+	const sortedRepos = Object.entries(repoCounter)
+		.sort(([aRepo, aCount], [bRepo, bCount]) => {
+			if (aCount !== bCount) {
+				return bCount - aCount; // Sort by count descending
+			}
+			return repoScores[bRepo] - repoScores[aRepo]; // If counts are equal, sort by score descending
+		})
+		.map(([repo, count]) => ({
+			repo,
+			count,
+			score: repoScores[repo],
+		}));
+
+	// Remove duplicates and user's own repos
+	const uniqueRecommendations = sortedRepos.filter(
+		(repo, index, self) =>
+			index === self.findIndex(t => t.repo === repo.repo) &&
+			!userRepos.some(userRepo => userRepo.repo === repo.repo)
+	);
+	const res = {
+		recommendations: uniqueRecommendations,
+		userRepos: userRepos.map(ur => ur.repo),
+	};
+	console.dir(res, { depth: 2 });
+
+	return c.json(res);
 });
 
 export default app;
