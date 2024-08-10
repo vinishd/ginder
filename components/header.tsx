@@ -29,7 +29,6 @@ export function Header({
   const navItems = [
     { href: "/", label: "Home" },
     { href: "/repository", label: "Repositories" },
-    { href: "/data", label: "GitHub Data" },
   ];
 
   return (
@@ -68,7 +67,11 @@ export function Header({
               <GitHub className="h-5 w-5" />
             </Link>
           </Button>
-          {status === "authenticated" ? (
+          {status === "loading" ? (
+            <Button variant="outline" disabled>
+              Loading...
+            </Button>
+          ) : status === "authenticated" ? (
             <Button onClick={() => signOut()} variant="outline">
               Sign out
             </Button>

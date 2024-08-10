@@ -29,15 +29,6 @@ export default function Home() {
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const { data: session } = useSession();
 
-	//useEffect(() => {
-	//	if (session) {
-	//		fetch('/api/process-repos', { method: 'POST' })
-	//			.then(response => response.json())
-	//			.then(data => console.log('Processing initiated:', data))
-	//			.catch(error => console.error('Error initiating processing:', error));
-	//	}
-	//}, [session]);
-
 	useEffect(() => {
 		if (!session) return;
 		const socket = socketIOClient(
@@ -109,8 +100,8 @@ export default function Home() {
 		resizeTextarea();
 	};
 
-	const sendMessage = async (message?: string) => {
-		if ((!input.trim() && !message) || isLoading) return;
+	const sendMessage = async (message?: string) => {``
+		if ((!input.trim() && !message) || isLoading || !session) return;
 
 		const newMessage = message || input;
 		setMessages(prev => [
@@ -165,21 +156,19 @@ export default function Home() {
 									</CardHeader>
 									<CardContent>
 										<p>
-											This chatbot is a tool to help you find the perfect open
-											source repository to contribute to.
+											Ginder is your personalized chatbot assistant for discovering
+											open source projects to contribute to!
 										</p>
-										<p>Here are some instructions to get started:</p>
+										<p className="mt-2">Here's how to get started:</p>
 										<ul className="list-disc pl-6 mt-2">
-											<li>
-												Connect your GitHub account to GINDER in "Data" section
-											</li>
-											<li>Let the chatbot know your skills and interests</li>
-											<li>The chatbot will suggest repositories to you</li>
-											<li>
-												Add repositories to "Repositories" section to monitor
-												open issues
-											</li>
+											<li>Let the chatbot know your programming skills and interests</li>
+											<li>The chatbot will suggest repositories that match your profile</li>
+											<li>Explore suggested projects and their open issues</li>
+											{/* <li>Save interesting repositories to your "Repositories" list for easy access</li> */}
 										</ul>
+										<p className="mt-2">
+											Ready to find your next exciting open source project? Let's begin!
+										</p>
 									</CardContent>
 								</Card>
 							</>
@@ -218,30 +207,32 @@ export default function Home() {
 				</ScrollArea>
 
 				{/* Example messages */}
-				<div className="p-4 bg-white dark:bg-zinc-950">
-					<div className="max-w-2xl mx-auto">
-						<div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-							{exampleMessages.map((example, index) => (
-								<div
-									key={index}
-									className={`cursor-pointer rounded-lg border bg-white p-4 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 ${
-										index > 1 && 'hidden md:block'
-									}`}
-									onClick={() => {
-										sendMessage(example.message);
-									}}
-								>
-									<div className="text-sm font-semibold dark:text-white">
-										{example.heading}
+				{messages.length === 0 && (
+					<div className="p-4 bg-white dark:bg-zinc-950">
+						<div className="max-w-2xl mx-auto">
+							<div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+								{exampleMessages.map((example, index) => (
+									<div
+										key={index}
+										className={`cursor-pointer rounded-lg border bg-white p-4 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 ${
+											index > 1 && 'hidden md:block'
+										}`}
+										onClick={() => {
+											sendMessage(example.message);
+										}}
+									>
+										<div className="text-sm font-semibold dark:text-white">
+											{example.heading}
+										</div>
+										<div className="text-sm text-zinc-600 dark:text-white">
+											{example.subheading}
+										</div>
 									</div>
-									<div className="text-sm text-zinc-600 dark:text-white">
-										{example.subheading}
-									</div>
-								</div>
-							))}
+								))}
+							</div>
 						</div>
 					</div>
-				</div>
+				)}
 
 				{/* Send message area */}
 				<div className="p-4 border-t">
