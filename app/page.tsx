@@ -15,6 +15,7 @@ export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 	return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
 }
 import { useSession } from 'next-auth/react';
+import { exampleMessages } from '@/lib/data/example-messages';
 
 export default function Home() {
 	const [messages, setMessages] = useState<
@@ -36,21 +37,6 @@ export default function Home() {
 	//			.catch(error => console.error('Error initiating processing:', error));
 	//	}
 	//}, [session]);
-
-	const exampleMessages = [
-		{
-			heading: 'What are some',
-			subheading: 'popular open source projects I can contribute to?',
-			message:
-				'What are some popular open source projects I can contribute to?',
-		},
-		{
-			heading: 'What are some',
-			subheading: 'popular open source projects I can contribute to?',
-			message:
-				'What are some popular open source projects I can contribute to?',
-		},
-	];
 
 	useEffect(() => {
 		if (!session) return;
