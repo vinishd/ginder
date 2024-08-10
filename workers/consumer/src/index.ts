@@ -1,4 +1,4 @@
-import { Ai, KVNamespace, D1Database } from '@cloudflare/workers-types';
+import { Ai, KVNamespace, D1Database, VectorizeIndex } from '@cloudflare/workers-types';
 import { Octokit } from '@octokit/rest';
 import { Buffer } from 'buffer';
 import dedent from 'dedent';
@@ -10,65 +10,38 @@ interface Env {
 	AI: Ai;
 	CACHE: KVNamespace;
 	DB: D1Database;
+	VECTORIZE_INDEX: VectorizeIndex;
 }
 
 interface Message {
 	repo: string;
 	githubToken: string;
-	username: string;
-	userId: number;
+	username?: string;
+	userId?: number;
+	isOpenSource?: boolean;
 }
 
 interface EmbeddingResponse {
 	shape: number[];
 	data: number[][];
 }
-async function process(message: Message, env: Env): Promise<void> {
-	const { repo, githubToken, username, userId } = message;
-	const db = drizzle(env.DB);
-	const userData = await db.select().from(user).where(eq(user.id, userId)).get();
-	if (!userData) {
-		console.error('User not found');
-		return;
-	}
 
-	const octokit = new Octokit({ auth: githubToken });
-	const [owner, repoName] = repo.split('/');
-	const key = `processed_${repo}`;
+async function generateRepoSummary(octokit: Octokit, owner: string, repoName: string, env: Env): Promise<string> {
+	// Fetch README content
+	const readmeResponse = await octokit.repos.getReadme({
+		owner,
+		repo: repoName,
+	});
+	const readmeContent = Buffer.from(readmeResponse.data.content, 'base64').toString('utf-8');
 
-	try {
-		const cacheExists = await env.CACHE.get(key);
-		if (cacheExists) {
-			const userRepoExists = await db
-				.select()
-				.from(userRepo)
-				.where(and(eq(userRepo.repo, repo), eq(userRepo.userId, userId)))
-				.get();
-			if (!userRepoExists) {
-				await db.insert(userRepo).values({ repo, userId });
-			}
+	// Fetch languages used in the repo
+	const languagesResponse = await octokit.repos.listLanguages({
+		owner,
+		repo: repoName,
+	});
+	const languages = Object.keys(languagesResponse.data).join(', ');
 
-			console.log('Already processed');
-			return;
-		}
-		const readmeResponse = await octokit.repos.getReadme({
-			owner,
-			repo: repoName,
-		});
-		const readmeContent = Buffer.from(readmeResponse.data.content, 'base64').toString('utf-8');
-		if (!readmeContent) {
-			console.error('README content not found');
-			return;
-		}
-
-		// Fetch languages used in the repo
-		const languagesResponse = await octokit.repos.listLanguages({
-			owner,
-			repo: repoName,
-		});
-		const languages = Object.keys(languagesResponse.data).join(', ');
-
-		const prompt = dedent`Based on the provided content, create a concise, bullet-point summary of the tech stack and technologies used in this project. Include only information that is explicitly mentioned or can be clearly inferred from the content provided. Omit any categories not addressed in the content. Do not include any project names, repository names, or other identifying information.
+	const prompt = dedent`Based on the provided content, create a concise, bullet-point summary of the tech stack and technologies used in this project. Include only information that is explicitly mentioned or can be clearly inferred from the content provided. Omit any categories not addressed in the content. Do not include any project names, repository names, or other identifying information.
 
 Use the following format, including only relevant sections:
 
@@ -85,14 +58,99 @@ Languages used: ${languages}
 
 Provide only the bullet-point summary, with no additional text before or after.`;
 
-		const genResp: BaseAiTextGeneration['postProcessedOutputs'] = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-			messages: [{ role: 'user', content: prompt }],
+	const genResp: BaseAiTextGeneration['postProcessedOutputs'] = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
+		messages: [{ role: 'user', content: prompt }],
+	});
+
+	if (genResp instanceof ReadableStream) {
+		throw new Error('Unexpected stream response');
+	}
+	return genResp.response as string;
+}
+
+async function processOpenSourceRepo(message: Message, env: Env): Promise<void> {
+	const { repo, githubToken } = message;
+	const key = `processed_${repo}`;
+
+	try {
+		// Check if the repo has already been processed
+		const cacheExists = await env.CACHE.get(key);
+		if (cacheExists) {
+			console.log('Already processed');
+			return;
+		}
+
+		const octokit = new Octokit({ auth: githubToken });
+		const [owner, repoName] = repo.split('/');
+
+		const summary = await generateRepoSummary(octokit, owner, repoName, env);
+		console.log('summary: ', summary);
+
+		const embeddingResp: EmbeddingResponse = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
+			text: summary,
 		});
 
-		if (genResp instanceof ReadableStream) {
-			throw new Error('Unexpected stream response');
+		// Convert the vector embeddings into a format Vectorize can accept
+		const vector: VectorizeVector = {
+			id: repo,
+			values: embeddingResp.data[0],
+			metadata: {
+				repo,
+				repoName,
+				owner,
+				summary,
+			},
+		};
+
+		// Upsert the vector into the Vectorize index
+		await env.VECTORIZE_INDEX.upsert([vector]);
+
+		// Store in KV cache
+		await env.CACHE.put(key, JSON.stringify(vector), {
+			metadata: vector.metadata,
+		});
+
+		console.log(`Processed and stored data for ${repo}`);
+	} catch (e) {
+		console.error('Error processing repository:', repo, e);
+	}
+}
+
+async function processUserRepo(message: Message, env: Env): Promise<void> {
+	const { repo, githubToken, username, userId } = message;
+	const key = `processed_${repo}`;
+	const db = drizzle(env.DB);
+
+	if (!userId || !username) {
+		console.error('User ID or username not provided');
+		return;
+	}
+
+	const userData = await db.select().from(user).where(eq(user.id, userId)).get();
+	if (!userData) {
+		console.error('User not found');
+		return;
+	}
+
+	const octokit = new Octokit({ auth: githubToken });
+	const [owner, repoName] = repo.split('/');
+
+	try {
+		const cacheExists = await env.CACHE.get(key);
+		if (cacheExists) {
+			const userRepoExists = await db
+				.select()
+				.from(userRepo)
+				.where(and(eq(userRepo.repo, repo), eq(userRepo.userId, userId)))
+				.get();
+			if (!userRepoExists) {
+				await db.insert(userRepo).values({ repo, userId });
+			}
+
+			console.log('Already processed');
+			return;
 		}
-		const summary = genResp.response as string;
+		const summary = await generateRepoSummary(octokit, owner, repoName, env);
 		console.log('Summary for', repo, ':', summary);
 
 		const embeddingResp: EmbeddingResponse = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
@@ -132,7 +190,11 @@ export default {
 				try {
 					const msg = JSON.parse(message.body as string) as Message;
 					console.log(`Processing repo: ${msg.repo} for user: ${msg.username}`);
-					await process(msg, env);
+					if (!!msg.isOpenSource) {
+						await processOpenSourceRepo(msg, env); // for open-source repos
+					} else {
+						await processUserRepo(msg, env); // for users' repos
+					}
 				} catch (error) {
 					console.error('Error processing message:', error);
 				}

@@ -17,6 +17,14 @@ interface Env {
 	CACHE: KVNamespace;
 }
 
+interface Message {
+	repo: string;
+	githubToken: string;
+	username?: string;
+	userId?: number;
+	isOpenSource?: boolean;
+}
+
 const app = new Hono<{ Bindings: Env }>();
 
 const authMiddleware = async (c: any, next: () => Promise<void>) => {
@@ -37,6 +45,35 @@ interface EmbeddingResponse {
 interface Summary {
 	[key: string]: any;
 }
+
+app.post('/batch-parse', async c => {
+	const { repos } = await c.req.json();
+	if (!repos || !Array.isArray(repos)) {
+		return c.json({ error: 'Array of repository names is required' }, 400);
+	}
+
+	const processedRepos: string[] = [];
+
+	try {
+		await Promise.all(
+			repos.map(async repo => {
+				const body: Message = {
+					repo,
+					githubToken: c.env.GITHUB_TOKEN,
+					isOpenSource: true,
+				};
+				await c.env.QUEUE.send(JSON.stringify(body));
+				processedRepos.push(repo);
+			})
+		);
+
+		console.log('Number of repos queued for parsing:', repos.length);
+
+		return c.json({ success: true, processedRepos });
+	} catch (e) {
+		return c.json({ error: (e as Error).message }, 500);
+	}
+});
 
 app.post('/parse', async c => {
 	// Get the README content from the request body
@@ -149,18 +186,17 @@ app.post('/process-user', async c => {
 				per_page: 300,
 			}
 		);
-		const processedRepos: any[] = []; // TODO: add interface
+		const processedRepos: string[] = [];
 
 		await Promise.all(
 			repos.map(async r => {
-				await c.env.QUEUE.send(
-					JSON.stringify({
-						repo: r.full_name,
-						githubToken,
-						username,
-						userId,
-					})
-				);
+				const body: Message = {
+					repo: r.full_name,
+					githubToken,
+					username,
+					userId,
+				};
+				await c.env.QUEUE.send(JSON.stringify(body));
 				processedRepos.push(r.full_name);
 			})
 		);

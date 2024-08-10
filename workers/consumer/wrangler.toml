@@ -7,6 +7,11 @@ compatibility_flags = ["nodejs_compat"]
 [ai]
 binding = "AI"
 
+[[vectorize]]
+binding = "VECTORIZE_INDEX"
+index_name = "ginder-repos"
+
+
 [[queues.consumers]]
 queue = "ginder-repo-processing-queue"
 max_batch_size = 1
