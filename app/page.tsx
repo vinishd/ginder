@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, KeyboardEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, KeyboardEvent } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,10 @@ export default function Home() {
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
 	const messagesEndRef = useRef<HTMLDivElement>(null);
-	const { data: session } = useSession() as { data: CustomSession | null };
+	const { data: session, status } = useSession() as {
+		data: CustomSession | null;
+		status: 'loading' | 'authenticated' | 'unauthenticated';
+	};
 	const [sessionId, setSessionId] = useState<string | null>(null);
 
 	useEffect(() => {
@@ -38,7 +41,7 @@ export default function Home() {
 		);
 
 		const socketEvents = {
-			connect: () => {
+			connect: async () => {
 				console.log('Connected with ID:', socket.id);
 				setSocketIOClientId(socket.id ?? '');
 			},
@@ -104,55 +107,74 @@ export default function Home() {
 		scrollToBottom();
 	}, [messages]);
 
+	useEffect(() => {
+		const init = async () => {
+			if (!sessionId && !!session?.userId) {
+				const sid = await queryFlowise({
+					question: `My user id is: ${session?.userId}; Strictly respond with: Hi, I'm Ginder, How can I help you today!`,
+					socketIOClientId,
+				});
+				setSessionId(sid);
+				console.log(`session id set to: ${sid}`);
+			}
+		};
+		init();
+	}, [session, socketIOClientId]);
+
 	const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		setInput(e.target.value);
 		resizeTextarea();
 	};
 
-	const sendMessage = async (message?: string) => {
-		if ((!input.trim() && !message) || isLoading || !session) return;
+	const sendMessage = useCallback(
+		async (message?: string) => {
+			if ((!input.trim() && !message) || isLoading || !session) return;
 
-		const newMessage = message || input;
-		setMessages(prev => [
-			...prev,
-			{ role: 'userMessage', content: newMessage },
-		]);
-		setInput('');
-		setIsLoading(true);
-
-		try {
-			const sid = await queryFlowise({
-				question: newMessage,
-				history: [
-					{
-						role: 'user',
-						content: `my userId is ${session?.userId}`,
-					},
-					...messages.map(msg => ({
-						role: msg.role,
-						content: msg.content,
-					})),
-				],
-				socketIOClientId,
-				sessionId,
-			});
-			if (!sessionId) {
-				setSessionId(sid);
-			}
-		} catch (error) {
-			console.error('Error:', error);
+			const newMessage = message || input;
 			setMessages(prev => [
 				...prev,
-				{
-					role: 'apiMessage',
-					content:
-						'Oops! Something went wrong. Please try again or ask a different question.',
-				},
+				{ role: 'userMessage', content: newMessage },
 			]);
-		} finally {
-			setIsLoading(false);
-		}
-	};
+			setInput('');
+			setIsLoading(true);
+
+			console.log(`sending new message with session id: ${sessionId}`);
+
+			try {
+				await queryFlowise({
+					question: newMessage,
+					socketIOClientId,
+					//sessionId,
+					overrideConfig: {
+						sessionId,
+					},
+				});
+			} catch (error) {
+				console.error('Error:', error);
+				setMessages(prev => [
+					...prev,
+					{
+						role: 'apiMessage',
+						content:
+							'Oops! Something went wrong. Please try again or ask a different question.',
+					},
+				]);
+			} finally {
+				setIsLoading(false);
+			}
+		},
+		[
+			input,
+			isLoading,
+			session,
+			socketIOClientId,
+			sessionId,
+			setMessages,
+			setInput,
+			setIsLoading,
+			queryFlowise,
+		]
+	);
 
 	const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === 'Enter' && !e.shiftKey) {
@@ -160,6 +182,14 @@ export default function Home() {
 			sendMessage();
 		}
 	};
+
+	if (status === 'loading') {
+		return (
+			<div className="flex items-center justify-center h-screen">
+				<div>Loading...</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="flex flex-col h-[calc(100vh-3.5rem)] relative">
@@ -229,24 +259,25 @@ export default function Home() {
 			<div className="p-4 bg-white dark:bg-zinc-950">
 				<div className="max-w-2xl mx-auto">
 					<div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-						{exampleMessages.map((example, index) => (
-							<div
-								key={index}
-								className={`cursor-pointer rounded-lg border bg-white p-4 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 ${
-									index > 1 && 'hidden md:block'
-								}`}
-								onClick={() => {
-									sendMessage(example.message);
-								}}
-							>
-								<div className="text-sm font-semibold dark:text-white">
-									{example.heading}
+						{messages.length <= 1 &&
+							exampleMessages.map((example, index) => (
+								<div
+									key={index}
+									className={`cursor-pointer rounded-lg border bg-white p-4 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 ${
+										index > 1 && 'hidden md:block'
+									}`}
+									onClick={() => {
+										sendMessage(example.message);
+									}}
+								>
+									<div className="text-sm font-semibold dark:text-white">
+										{example.heading}
+									</div>
+									<div className="text-sm text-zinc-600 dark:text-white">
+										{example.subheading}
+									</div>
 								</div>
-								<div className="text-sm text-zinc-600 dark:text-white">
-									{example.subheading}
-								</div>
-							</div>
-						))}
+							))}
 					</div>
 				</div>
 			</div>

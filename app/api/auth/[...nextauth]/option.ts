@@ -21,6 +21,7 @@ interface User {
 
 export interface CustomSession extends Session {
 	userId?: string;
+	status: string;
 }
 
 export const options: AuthOptions = {
