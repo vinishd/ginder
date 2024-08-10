@@ -265,6 +265,13 @@ app.get('/user-recommendations/:userId', async c => {
 		return c.json({ error: 'Invalid user ID' }, 400);
 	}
 
+	const cacheKey = `cached_recommendation_${userId}`;
+	const cachedRecommendations = await c.env.CACHE.get(cacheKey, 'json');
+
+	if (cachedRecommendations) {
+		return c.json(cachedRecommendations);
+	}
+
 	const db = drizzle(c.env.DB);
 
 	// Fetch user's repos from the database
@@ -282,7 +289,8 @@ app.get('/user-recommendations/:userId', async c => {
 	// Fetch vectors from cache and perform top-k search
 	const repoCounter: { [key: string]: number } = {};
 	const repoScores: { [key: string]: number } = {};
-	const topK = 5; // Adjust this value as needed
+	const repoSummaries: { [key: string]: string } = {};
+	const topK = 5;
 
 	for (const userRepoEntry of userRepos) {
 		const cacheKey = `processed_${userRepoEntry.repo}`;
@@ -302,6 +310,9 @@ app.get('/user-recommendations/:userId', async c => {
 				const repo = match.metadata.repo as string;
 				repoCounter[repo] = (repoCounter[repo] || 0) + 1;
 				repoScores[repo] = Math.max(repoScores[repo] || 0, match.score);
+				if (!repoSummaries[repo]) {
+					repoSummaries[repo] = match.metadata.summary as string;
+				}
 			});
 		}
 	}
@@ -310,14 +321,15 @@ app.get('/user-recommendations/:userId', async c => {
 	const sortedRepos = Object.entries(repoCounter)
 		.sort(([aRepo, aCount], [bRepo, bCount]) => {
 			if (aCount !== bCount) {
-				return bCount - aCount; // Sort by count descending
+				return bCount - aCount;
 			}
-			return repoScores[bRepo] - repoScores[aRepo]; // If counts are equal, sort by score descending
+			return repoScores[bRepo] - repoScores[aRepo];
 		})
 		.map(([repo, count]) => ({
 			repo,
-			count,
+			matches: count,
 			score: repoScores[repo],
+			summary: repoSummaries[repo],
 		}));
 
 	// Remove duplicates and user's own repos
@@ -331,6 +343,11 @@ app.get('/user-recommendations/:userId', async c => {
 		userRepos: userRepos.map(ur => ur.repo),
 	};
 	console.dir(res, { depth: 2 });
+
+	// Cache the results
+	await c.env.CACHE.put(cacheKey, JSON.stringify(res), {
+		expirationTtl: 86400, // 1 day in seconds
+	});
 
 	return c.json(res);
 });
