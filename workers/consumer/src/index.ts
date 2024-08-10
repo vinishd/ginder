@@ -3,7 +3,7 @@ import { Octokit } from '@octokit/rest';
 import { Buffer } from 'buffer';
 import dedent from 'dedent';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { user, userRepo } from './db/schema';
 
 interface Env {
@@ -37,8 +37,17 @@ async function process(message: Message, env: Env): Promise<void> {
 	const key = `processed_${repo}`;
 
 	try {
-		const exists = await env.CACHE.get(key);
-		if (exists) {
+		const cacheExists = await env.CACHE.get(key);
+		if (cacheExists) {
+			const userRepoExists = await db
+				.select()
+				.from(userRepo)
+				.where(and(eq(userRepo.repo, repo), eq(userRepo.userId, userId)))
+				.get();
+			if (!userRepoExists) {
+				await db.insert(userRepo).values({ repo, userId });
+			}
+
 			console.log('Already processed');
 			return;
 		}
@@ -127,7 +136,7 @@ export default {
 				} catch (error) {
 					console.error('Error processing message:', error);
 				}
-			})
+			}),
 		);
 	},
 };
