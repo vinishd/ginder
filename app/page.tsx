@@ -10,6 +10,7 @@ import socketIOClient from 'socket.io-client';
 import { CornerDownLeft } from 'lucide-react';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import { type ThemeProviderProps } from 'next-themes/dist/types';
+import ReactMarkdown from 'react-markdown';
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
 	return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
@@ -234,13 +235,13 @@ export default function Home() {
 										</div>
 									)}
 									<div
-										className={`rounded-lg p-3 max-w-[70%] ${
-											message.role === 'userMessage'
+										className={`rounded-lg p-3 max-w-[70%] ${message.role === 'userMessage'
 												? 'bg-blue-500 text-white'
 												: 'bg-gray-200 text-gray-800'
-										}`}
+											}`}
 									>
-										{message.content}
+
+										<ReactMarkdown>{message.content}</ReactMarkdown>
 									</div>
 									{message.role === 'userMessage' && (
 										<div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center ml-2">
@@ -263,9 +264,8 @@ export default function Home() {
 							exampleMessages.map((example, index) => (
 								<div
 									key={index}
-									className={`cursor-pointer rounded-lg border bg-white p-4 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 ${
-										index > 1 && 'hidden md:block'
-									}`}
+									className={`cursor-pointer rounded-lg border bg-white p-4 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 ${index > 1 && 'hidden md:block'
+										}`}
 									onClick={() => {
 										sendMessage(example.message);
 									}}
