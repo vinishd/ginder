@@ -98,21 +98,24 @@ export default function Home() {
 		resizeTextarea();
 	}, [input]);
 
-	const scrollToBottom = () => {
-		if (messagesEndRef.current) {
-			messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+	const scrollToBottom = useCallback(() => {
+		if (scrollAreaRef.current) {
+			const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+			if (scrollContainer) {
+				scrollContainer.scrollTop = scrollContainer.scrollHeight;
+			}
 		}
-	};
+	}, []);
 
 	useEffect(() => {
 		scrollToBottom();
-	}, [messages]);
+	}, [messages, scrollToBottom]);
 
 	useEffect(() => {
 		const init = async () => {
 			if (!sessionId && !!session?.userId) {
 				const sid = await queryFlowise({
-					question: `My user id is: ${session?.userId}; Strictly respond with: Hi, I'm Ginder, How can I help you today!`,
+					question: `My user ID is the number: ${session?.userId}; Strictly respond with: Hi, I'm Ginder, How can I help you today!`,
 					socketIOClientId,
 				});
 				setSessionId(sid);
@@ -145,7 +148,6 @@ export default function Home() {
 				await queryFlowise({
 					question: newMessage,
 					socketIOClientId,
-					//sessionId,
 					overrideConfig: {
 						sessionId,
 					},
@@ -174,6 +176,7 @@ export default function Home() {
 			setInput,
 			setIsLoading,
 			queryFlowise,
+			messages.length,
 		]
 	);
 
@@ -265,9 +268,11 @@ export default function Home() {
 								<div
 									key={index}
 									className={`cursor-pointer rounded-lg border bg-white p-4 hover:bg-zinc-50 dark:bg-zinc-950 dark:hover:bg-zinc-900 ${index > 1 && 'hidden md:block'
-										}`}
+										} ${messages.length === 0 && 'opacity-50 cursor-not-allowed'}`}
 									onClick={() => {
-										sendMessage(example.message);
+										if (messages.length > 0) {
+											sendMessage(example.message);
+										}
 									}}
 								>
 									<div className="text-sm font-semibold dark:text-white">
@@ -299,10 +304,11 @@ export default function Home() {
 							onKeyDown={handleKeyDown}
 							placeholder="Send a message."
 							className="flex-1 min-h-[50px] p-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+							disabled={messages.length === 0}
 						/>
 						<Button
 							type="submit"
-							disabled={isLoading}
+							disabled={isLoading || messages.length === 0}
 							className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-800"
 						>
 							<CornerDownLeft size={24} />
@@ -312,4 +318,4 @@ export default function Home() {
 			</div>
 		</div>
 	);
-}
+};
