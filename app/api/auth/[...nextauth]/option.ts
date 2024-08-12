@@ -109,4 +109,5 @@ export const options: AuthOptions = {
 			return true;
 		},
 	},
+	secret: process.env.NEXTAUTH_SECRET,
 };
