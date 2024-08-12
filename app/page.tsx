@@ -31,7 +31,11 @@ export default function Home() {
 	const [sessionId, setSessionId] = useState<string | null>(null);
 
 	useEffect(() => {
-		if (!session) return;
+		if (!session) {
+			console.log('No session available, skipping socket setup');
+			return;
+		}
+		console.log('Setting up socket connection');
 		const socket = socketIOClient(
 			process.env.NEXT_PUBLIC_FLOWISE_BASE_URL ?? 'http://localhost:3000'
 		);
@@ -74,11 +78,14 @@ export default function Home() {
 			socket.on(event, handler);
 		});
 
+		console.log('Socket connection setup complete');
+
 		return () => {
 			if (session && socket.connected) {
 				console.log('Disconnecting socket');
 				socket.disconnect();
 			}
+			console.log('Socket connection cleanup complete');
 		};
 	}, [session]);
 
@@ -108,13 +115,21 @@ export default function Home() {
 
 	useEffect(() => {
 		const init = async () => {
+			console.log('Initializing session', { sessionId, userId: session?.userId });
 			if (!sessionId && !!session?.userId) {
-				const sid = await queryFlowise({
-					question: `My user ID is the number: ${session?.userId}; Strictly respond with: Hi, I'm Ginder, How can I help you today!`,
-					socketIOClientId,
-				});
-				setSessionId(sid);
-				console.log(`session id set to: ${sid}`);
+				console.log('Querying Flowise for session initialization');
+				try {
+					const sid = await queryFlowise({
+						question: `My user ID is the number: ${session?.userId}; Strictly respond with: Hi, I'm Ginder, How can I help you today!`,
+						socketIOClientId,
+					});
+					console.log('Flowise query successful, setting session ID:', sid);
+					setSessionId(sid);
+				} catch (error) {
+					console.error('Error querying Flowise:', error);
+				}
+			} else {
+				console.log('Session already initialized or user ID not available');
 			}
 		};
 		init();

@@ -38,7 +38,7 @@ export const options: AuthOptions = {
 	],
 	callbacks: {
 		async jwt({ token, user, account, profile }) {
-			// Persist the OAuth access_token to the token right after signin
+			console.log('JWT callback', { token, user, account, profile });
 			if (account) {
 				token.accessToken = account.access_token;
 				token.username = (profile as any)?.login;
@@ -54,7 +54,7 @@ export const options: AuthOptions = {
 			token: JWT;
 			user: any;
 		}) {
-			// Send properties to the client, like an access_token from a provider.
+			console.log('Session callback', { session, token, user });
 			session.accessToken = token.accessToken;
 			session.username = token.username;
 
@@ -64,6 +64,7 @@ export const options: AuthOptions = {
 			const name = session.user.name;
 
 			try {
+				console.log('Fetching user data from worker');
 				const res = await fetch(`${process.env.WORKER_URL}/users`, {
 					method: 'POST',
 					headers: {
@@ -78,8 +79,10 @@ export const options: AuthOptions = {
 					}),
 				});
 				const { id: userId }: User = await res.json();
+				console.log('User data fetched, userId:', userId);
 				session.userId = userId;
 
+				console.log('Processing user');
 				const processRes = await fetch(
 					`${process.env.WORKER_URL}/process-user`,
 					{
@@ -96,12 +99,15 @@ export const options: AuthOptions = {
 				);
 
 				if (!processRes.ok) {
+					console.error('Failed to process user', await processRes.text());
 					throw new Error('Failed to process user');
 				}
+				console.log('User processed successfully');
 			} catch (error) {
-				console.error(error);
+				console.error('Error in session callback:', error);
 			}
 
+			console.log('Final session object:', session);
 			return session;
 		},
 
