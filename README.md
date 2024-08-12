@@ -24,7 +24,7 @@ GINDER is a personalized chatbot that finds open-source companies for you to con
 ## How It Works
 
 **Connect Your GitHub Account**  
-Log in to GINDER and grant permission to read the code in your repositories.
+Log in to Github and grant GINDER permission to read the code in your repositories.
 
 **Analyze & Match**  
 GINDER will analyze the languages and frameworks you use most often. It then cross-references this information with a large database of open-source companies.
