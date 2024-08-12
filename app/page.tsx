@@ -8,13 +8,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { queryFlowise } from '../lib/actions/flowise';
 import socketIOClient from 'socket.io-client';
 import { CornerDownLeft } from 'lucide-react';
-import { ThemeProvider as NextThemesProvider } from 'next-themes';
-import { type ThemeProviderProps } from 'next-themes/dist/types';
 import ReactMarkdown from 'react-markdown';
 
-export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-	return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
-}
 import { useSession } from 'next-auth/react';
 import { exampleMessages } from '@/lib/data/example-messages';
 import { CustomSession } from '@/app/api/auth/[...nextauth]/option';
@@ -123,7 +118,7 @@ export default function Home() {
 			}
 		};
 		init();
-	}, [session, socketIOClientId]);
+	}, [session, socketIOClientId, sessionId]);
 
 	const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		setInput(e.target.value);
@@ -175,8 +170,6 @@ export default function Home() {
 			setMessages,
 			setInput,
 			setIsLoading,
-			queryFlowise,
-			messages.length,
 		]
 	);
 
@@ -213,12 +206,12 @@ export default function Home() {
 									<p>Here are some instructions to get started:</p>
 									<ul className="list-disc pl-6 mt-2">
 										<li>
-											Connect your GitHub account to GINDER in "Data" section
+											Connect your GitHub account to GINDER in &quot;Data&quot; section
 										</li>
 										<li>Let the chatbot know your skills and interests</li>
 										<li>The chatbot will suggest repositories to you</li>
 										<li>
-											Add repositories to "Repositories" section to monitor open
+											Add repositories to &quot;Repositories&quot; section to monitor open
 											issues
 										</li>
 									</ul>
